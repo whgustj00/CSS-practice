@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <title>음악 재생 및 음계 시각화</title>
+    <style>
+      body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background-color: #f0f0f0;
+      }
+
+      .note-container {
+        display: flex;
+        margin-top: 40px;
+      }
+
+      .note {
+        display: inline-block;
+        height: 50px;
+        width: 50px;
+        border: 1px solid lightgray;
+        text-align: center;
+        line-height: 50px;
+        background-color: white;
+        margin: 2px;
+        transition: background-color 0.3s;
+      }
+
+      .active {
+        background-color: green; /* 활성화된 음계를 초록색으로 표시 */
+        position: relative;
+        top: 15px;
+      }
+    </style>
+  </head>
+  <body>
+    <h3>음악 재생 및 음계 시각화</h3>
+    <p>오디오 컨트롤러를 사용해 음악을 재생하거나 일시 정지</p>
+
+    <!-- 오디오 컨트롤러 -->
+    <audio id="audio" src="media/비행기.mp3" controls preload="auto"></audio>
+
+    <!-- 음계 컨테이너 -->
+    <div class="note-container">
+      <div class="note" id="note-0">도(C3)</div>
+      <div class="note" id="note-1">레(D3)</div>
+      <div class="note" id="note-2">미(E3)</div>
+      <div class="note" id="note-3">파(F3)</div>
+      <div class="note" id="note-4">솔(G3)</div>
+      <div class="note" id="note-5">라(A3)</div>
+      <div class="note" id="note-6">시(B3)</div>
+      <div class="note" id="note-7">도(C4)</div>
+      <div class="note" id="note-8">레(D4)</div>
+      <div class="note" id="note-9">미(E4)</div>
+      <div class="note" id="note-10">파(F4)</div>
+      <div class="note" id="note-11">솔(G4)</div>
+      <div class="note" id="note-12">라(A4)</div>
+      <div class="note" id="note-13">시(B4)</div>
+    </div>
+
+    <script>
+      const notes = document.querySelectorAll(".note");
+      const audio = document.getElementById("audio");
+      let audioContext, analyser, dataArray;
+
+      // 기본 음계 주파수 (Hz)와 허용 오차
+      const baseFrequencies = {
+        "도 (C3)": 130.8,
+        "레 (D3)": 146.8,
+        "미 (E3)": 164.8,
+        "파 (F3)": 174.6,
+        "솔 (G3)": 196.0,
+        "라 (A3)": 220.0,
+        "시 (B3)": 246.9,
+        "도 (C4)": 261.6,
+        "레 (D4)": 294,
+        "미 (E4)": 330,
+        "파 (F4)": 349,
+        "솔 (G4)": 392,
+        "라 (A4)": 440,
+        "시 (B4)": 494,
+      };
+
+      const tolerance = 10; // 허용 오차 (Hz)
+
+      // 주파수 범위 설정
+      const frequencyRanges = Object.entries(baseFrequencies).map(
+        ([note, frequency]) => ({
+          name: note,
+          min: frequency - tolerance,
+          max: frequency + tolerance,
+        })
+      );
+
+      function setupAudio() {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioContext.createMediaElementSource(audio);
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 8192; // FFT 사이즈 조정
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+        source.connect(analyser);
+        analyser.connect(audioContext.destination);
+      }
+
+      function updateNotes() {
+        analyser.getByteFrequencyData(dataArray);
+
+        // 주파수 대역별로 각 음에 해당하는 인덱스를 계산합니다.
+        const frequencyData = Array.from(dataArray);
+        const maxFrequencyIndex = frequencyData.indexOf(
+          Math.max(...frequencyData)
+        );
+
+        // 주파수 값 계산
+        const frequency =
+          (maxFrequencyIndex * audioContext.sampleRate) /
+          (analyser.fftSize * 2);
+
+        // 모든 음계의 'active' 클래스를 제거합니다.
+        notes.forEach((note) => note.classList.remove("active"));
+
+        // 현재 주파수에 가장 가까운 음계를 찾고 'active' 클래스 추가
+        const closestNoteIndex = findClosestNoteIndex(frequency);
+        if (closestNoteIndex !== -1) {
+          notes[closestNoteIndex].classList.add("active");
+        }
+
+        // 다음 애니메이션 프레임 호출
+        requestAnimationFrame(updateNotes);
+      }
+
+      function findClosestNoteIndex(frequency) {
+        let closestIndex = -1;
+
+        frequencyRanges.forEach(({ min, max }, index) => {
+          if (frequency >= min && frequency <= max) {
+            closestIndex = index;
+          }
+        });
+
+        return closestIndex;
+      }
+
+      audio.addEventListener("play", () => {
+        if (!audioContext) {
+          setupAudio();
+        }
+        updateNotes();
+      });
+
+      audio.addEventListener("pause", () => {
+        notes.forEach((note) => note.classList.remove("active"));
+      });
+
+      audio.addEventListener("ended", () => {
+        notes.forEach((note) => note.classList.remove("active"));
+      });
+    </script>
+  </body>
+</html>
